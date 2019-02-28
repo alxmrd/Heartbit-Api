@@ -30,7 +30,7 @@ $JwtAuthentication=new Tuupola\Middleware\JwtAuthentication([
     "attribute" => "decoded_token_data",
     
     "path" => ["/api"],
-    "ignore" => ["/api/login"],
+    "ignore" => ["/api/login","/api/mobilelogin"],
     "secure" => true,
     "relaxed" => ["localhost", "dev.example.com"], // when in deployment must set from localhost to zafora
     "secret" => getenv("SECRET_KEY"),

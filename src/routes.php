@@ -41,6 +41,7 @@ $app->post('/api/login', function (Request $request, Response $response, array $
     $username = $userData->{'username'};
     $password = $userData->{'password'};
     // $status = 0;
+    
 
     $query = "SELECT * FROM ekab WHERE username=:username";
     $result = $pdo->prepare($query);
@@ -65,6 +66,53 @@ $app->post('/api/login', function (Request $request, Response $response, array $
 
         } else {
             $message = "Kάτι πήγε στραβα. Προσπαθήστε ξανά!";
+            $data = array('status' => 'error', 'data' => null, 'message' => $message, 401);
+            $response = json_encode($data);
+            return $response;
+        }
+    } else {
+
+        $message = "Kάτι πήγε στραβα. Προσπαθήστε ξανά!";
+        $data = array('status' => 'error', 'data' => null, 'message' => $message, 401);
+        $response = json_encode($data);
+        return $response;
+
+    }
+
+    $result->closeCursor();
+    $pdo = null;
+});
+$app->post('/api/mobilelogin', function (Request $request, Response $response, array $args) {
+    global $pdo;
+
+    $userData = json_decode(file_get_contents('php://input'));
+    $username = $userData->{'username'};
+    $password = $userData->{'password'};
+    // $status = 0;
+
+    $query = "SELECT * FROM volunteer WHERE username=:username";
+    $result = $pdo->prepare($query);
+    $result->execute(array(':username' => $username));
+    $count = $result->rowCount();
+    $user = $result->fetch(PDO::FETCH_BOTH);
+
+    if ($count == 1 && !empty($user)) {
+
+        if ($password == $user[password]) {
+            $_SESSION['username'] = $username;
+            $_SESSION['success'] = "You are now logged in";
+            $message = "successfully logged in";
+            if (isset($_SESSION['username'])) {
+                $settings = $this->get('settings');
+                $token = JWT::encode(['id' => $user->id, 'username' => $user->username], $settings['jwt']['secret'], "HS256");
+                $data = array("username" => $username, 'status' => 'success', 'message' => $message, 'token' => $token);
+
+                $response = json_encode($data);
+            }
+            return $response;
+
+        } else {
+            $message = "Kάτι πήγε στραβα. Προσπαθήστε ξανά,strava!";
             $data = array('status' => 'error', 'data' => null, 'message' => $message, 401);
             $response = json_encode($data);
             return $response;
@@ -1476,6 +1524,45 @@ $app->get('/api/login/success', function (ServerRequestInterface $request, Respo
 
    
 });
+$app->get('/api/volunteerlogin/success', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+
+   $input = $request->getQueryParam('input');
+
+
+    $query = " SELECT * FROM volunteer WHERE  username=:username ";
+   
+
+    $result = $pdo->prepare($query);
+    $result->execute(array(':username' => $input));
+  
+   
+    $count = $result->rowCount();
+   
+    if ($count== 0){
+        $message = "O χρήστης που αναζητήσατε, δεν υπάρχει!";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message, 409);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 404);
+       
+
+        return $response;
+
+    }
+    $user = $result->fetch(PDO::FETCH_ASSOC);
+  
+
+    // $myObj = new stdClass();
+    // $myObj->user = $user;
+   
+    $response = json_encode($user, JSON_NUMERIC_CHECK);
+    return $response;
+
+   
+});
 $app->post('/api/arduino/simulator', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
     global $pdo;
 
@@ -1494,10 +1581,40 @@ $app->post('/api/arduino/simulator', function (ServerRequestInterface $request, 
    
 });
 
+$app->post('/api/sendMessage', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+    $sendData = json_decode(file_get_contents('php://input'));
+    $message = $sendData->{'message'};
+
+  
+    $options = array(
+      'cluster' => 'eu',
+      'useTLS' => true
+    );
+    $pusher = new Pusher\Pusher(
+      '2f7f2a748cacde676705',
+      '8dff9e8bcc92dd2cd680',
+      '706595',
+      $options
+    );
+  
+    $data['message'] = $message;
+    $pusher->trigger('channel', 'event', $data);
+
+
+    $myObj = new stdClass();
+    $myObj->message = $message;
+   
+  
+    return json_encode($myObj);
+
+   
+});
+
 $app->add(function ($req, $res, $next) {
     $response = $next($req, $res);
     return $response
-        ->withHeader('Access-Control-Allow-Origin', 'http://localhost:3000')
+        ->withHeader('Access-Control-Allow-Origin', '*')
         ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
         ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
 });
