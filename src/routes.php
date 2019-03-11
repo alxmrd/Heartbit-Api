@@ -770,6 +770,10 @@ $app->post('/api/insertevent', function (ServerRequestInterface $request, Respon
     global $pdo;
     $userData = json_decode(file_get_contents('php://input'));
 
+
+
+
+
     $longitude = $userData->{'longitude'};
     $latitude = $userData->{'latitude'};
     $address = $userData->{'address'};
@@ -811,6 +815,7 @@ $message="Επιτυχης Προσθήκη Περιστατικού";
         $myObj->active = $active;
     $response=json_encode($myObj,JSON_NUMERIC_CHECK);
     return $response;
+    
        
        
 
@@ -1583,6 +1588,7 @@ $app->post('/api/arduino/simulator', function (ServerRequestInterface $request, 
 
 $app->post('/api/sendMessage', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
     global $pdo;
+  
     $sendData = json_decode(file_get_contents('php://input'));
     $message = $sendData->{'message'};
 
@@ -1604,9 +1610,25 @@ $app->post('/api/sendMessage', function (ServerRequestInterface $request, Respon
 
     $myObj = new stdClass();
     $myObj->message = $message;
-   
+
+    $interestDetails = ['unique identifier', 'ExponentPushToken[CZ5D9yFnlEr-BEoEpw9M8L]'];
   
+    // You can quickly bootup an expo instance
+    $expo = \ExponentPhpSDK\Expo::normalSetup();
+    
+    // Subscribe the recipient to the server
+    $expo->subscribe($interestDetails[0], $interestDetails[1]);
+    
+    // Build the notification data
+    $notification = ['title' => 'Έχετε νέο μήνυμα','body'=>$message];
+    
+    // Notify an interest with a notification
+    
+   
+    $expo->notify($interestDetails[0], $notification);
     return json_encode($myObj);
+   
+    
 
    
 });
