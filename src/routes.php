@@ -821,52 +821,58 @@ $message="Επιτυχης Προσθήκη Περιστατικού";
 
 
 });
-$app->post('/api/insertdefibrillator', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+$app->post('/api/sendEvent', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
     global $pdo;
     $userData = json_decode(file_get_contents('php://input'));
 
+
+
+
+
     $longitude = $userData->{'longitude'};
     $latitude = $userData->{'latitude'};
-    $location = $userData->{'address'};
-
-    if ($longitude== null ){
-        $message = "Kατι πήγε στραβά!";
-        $httpstatus = "error";
-        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message, 409);
-        $myObj = new stdClass();
-        $myObj->message = $message;
-        $myObj->httpstatus = $httpstatus;
-        $response = $response->withJson($myObj, 404);
-       
-
-        return $response;
-
-    }
+    $address = $userData->{'address'};
    
    
-
-    $query = "INSERT INTO apinidotis (longitude, latitude, location) VALUES (:longitude,:latitude, :location)";
-   
-    $result = $pdo->prepare($query);
-
-    $result->execute(array(':longitude' => $longitude, ':latitude' => $latitude, ':location' => $location));
-
-    $lastId = $pdo->lastInsertId();
-    $timezone  = +2;
-    // $datetime = date('Y-d-m H:i:s', time()+ 3600*($timezone+date("I")));
-
   
+  
+    $options = array(
+      'cluster' => 'eu',
+      'useTLS' => true
+    );
+    $pusher = new Pusher\Pusher(
+      '2f7f2a748cacde676705',
+      '8dff9e8bcc92dd2cd680',
+      '706595',
+      $options
+    );
+    $myObj = new stdClass();
+    $myObj->longitude = $longitude;
+    $myObj->latitude = $latitude;
+    $myObj->address = $address;
 
-        $myObj = new stdClass();
-        $myObj->id = $lastId;
+    $data = $myObj;
+    //$data['address'] = $myObj;
+    $pusher->trigger('channel', 'peristatiko', $data);
+
+
     
-        $myObj->longitude = $longitude;
-        $myObj->latitude = $latitude;
-        $myObj->location = $location;
 
-    $response=json_encode($myObj,JSON_NUMERIC_CHECK);
-    return $response;
-       
+    $interestDetails = ['unique identifier', 'ExponentPushToken[CZ5D9yFnlEr-BEoEpw9M8L]'];
+  
+    // You can quickly bootup an expo instance
+    $expo = \ExponentPhpSDK\Expo::normalSetup();
+    
+    // Subscribe the recipient to the server
+    $expo->subscribe($interestDetails[0], $interestDetails[1]);
+    
+    // Build the notification data
+    $notification = ['title' => 'Υπάρχει νεο περιστατικό','body'=>$address];
+    
+    // Notify an interest with a notification
+    
+   
+    $expo->notify($interestDetails[0], $notification);
        
 
 
