@@ -282,6 +282,7 @@ $app->post('/api/editvolunteer/{id}', function (Request $request, Response $resp
     $password = $userData->{'password'};
     $tel1 = $userData->{'tel1'};
     $tel2 = $userData->{'tel2'};
+    $RFID = $userData->{'RFID'};
     if ($tel2== 0) {$tel2 = null;};
     $email = $userData->{'email'};
       $dateofbirth = $userData->{'dateofbirth'};
@@ -412,6 +413,17 @@ $app->post('/api/editvolunteer/{id}', function (Request $request, Response $resp
 
         return $response;
     }
+    if (!$RFIDValidator->validate($RFID)) {
+        $message = "To RFID πρέπει να είναι 16ψήφιος αριθμός. ";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    }
 
     $query = "SELECT * FROM volunteer WHERE username=:username  AND id<>:id";
     $result = $pdo->prepare($query);
@@ -446,13 +458,14 @@ $app->post('/api/editvolunteer/{id}', function (Request $request, Response $resp
 
             return $response;
         } else {
-            $query = "UPDATE volunteer SET username=:username, name=:name,  surname=:surname, password=:password, tel1=:tel1, tel2=:tel2, email=:email, dateofbirth=:dateofbirth, latesttraining=:latesttraining, address=:address,location=:location  WHERE id=:id";
+            $query = "UPDATE volunteer SET username=:username, name=:name,  surname=:surname, password=:password, tel1=:tel1, tel2=:tel2, email=:email, dateofbirth=:dateofbirth, latesttraining=:latesttraining, address=:address,location=:location,RFID=:RFID  WHERE id=:id";
             $result = $pdo->prepare($query);
-            $result->execute(array(':username' => $username, ':name' => $name, ':surname' => $surname, ':password' => $password, ':tel1' => $tel1, ':tel2' => $tel, ':email' => $email, ':dateofbirth' => $dateofbirth, ':latesttraining' => $latesttraining, ':address' => $address, ':location' => $location, ':id' => $volunteers_id));
+            $result->execute(array(':username' => $username, ':name' => $name, ':surname' => $surname, ':password' => $password, ':tel1' => $tel1, ':tel2' => $tel, ':email' => $email, ':dateofbirth' => $dateofbirth, ':latesttraining' => $latesttraining, ':address' => $address, ':location' => $location, ':RFID'=>$RFID,':id' => $volunteers_id));
             $message = "success";
             
             $myObj = new stdClass();
             $myObj->id = $volunteers_id;
+            $myObj->RFID = $RFID;
             $myObj->username = $username;
             $myObj->name = $name;
             $myObj->surname = $surname;
@@ -567,6 +580,9 @@ $app->post('/api/insertvolunteer', function (ServerRequestInterface $request, Re
     $tel1 = $userData->{'tel1'};
     $tel2 = $userData->{'tel2'};
     $tel2 = $userData->{'tel2'};
+    $RFID = $userData->{'RFID'};
+   
+    $dateofbirth = $userData->{'dateofbirth'};
     if ($tel2== 0) {$tel2 = null;};
     $email = $userData->{'email'};
 
@@ -697,6 +713,17 @@ $app->post('/api/insertvolunteer', function (ServerRequestInterface $request, Re
 
         return $response;
     }
+    if (!$RFIDValidator->validate($RFID)) {
+        $message = "To RFID πρέπει να είναι 16ψήφιος αριθμός. ";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    }
 
     $query = "SELECT * FROM volunteer WHERE username=:username";
     $result = $pdo->prepare($query);
@@ -732,10 +759,10 @@ $app->post('/api/insertvolunteer', function (ServerRequestInterface $request, Re
             return $response;
         } else {
             $status = "0";
-            $query = "INSERT INTO volunteer (username,name,surname,password,tel1,tel2,email,dateofbirth,latesttraining,address,location,status) VALUES (:username,:name,:surname,:password,:tel1,:tel2,:email,:dateofbirth,:latesttraining,:address,:location,:status)";
+            $query = "INSERT INTO volunteer (username,name,surname,password,tel1,tel2,email,dateofbirth,latesttraining,address,location,status,RFID) VALUES (:username,:name,:surname,:password,:tel1,:tel2,:email,:dateofbirth,:latesttraining,:address,:location,:status,:RFID)";
             $result = $pdo->prepare($query);
 
-            $result->execute(array(':username' => $username, ':name' => $name, ':surname' => $surname, ':password' => $password, ':tel1' => $tel1, ':tel2' => $tel, ':email' => $email, ':dateofbirth' => $dateofbirth, ':latesttraining' => $latesttraining, ':address' => $address, ':location' => $location, ':status' => $status));
+            $result->execute(array(':username' => $username, ':name' => $name, ':surname' => $surname, ':password' => $password, ':tel1' => $tel1, ':tel2' => $tel, ':email' => $email, ':dateofbirth' => $dateofbirth, ':latesttraining' => $latesttraining, ':address' => $address, ':location' => $location, ':status' => $status,':RFID'=>$RFID));
             $lastId = $pdo->lastInsertId();
           
             $message = "success";
@@ -754,7 +781,7 @@ $app->post('/api/insertvolunteer', function (ServerRequestInterface $request, Re
             $myObj->address = $address;
             $myObj->location = $location;
             $myObj->status = $status;
-            
+            $myObj->RFID = $RFID;
             $myObj->message = $message;
            
 

@@ -16,4 +16,5 @@ $passwordValidator = v::stringType()->alnum($greek)->notBlank()->length(10,10);
 $defibrillatordateValidator=v::optional(v::date('Y-m-d')->between('2019-01-01', 'now'))->notBlank();
 $patientDateOfBirth=v::intType()->min(1950)->max(2010);
 $adminTypeValidator=v::alnum($greek)->stringType()->noWhitespace();
+$RFIDValidator = v::intVal()->notBlank();
 
