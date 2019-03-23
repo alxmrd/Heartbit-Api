@@ -534,7 +534,7 @@ $app->post('/api/defibrillator/locker', function (Request $request, Response $re
     $defibrillator_id = $defibrillatorData->{'id'};
     $locker = $defibrillatorData->{'locker'};
      
-    if ($locker == 0) {
+    if ($locker == 0 ) {
         $response_locker = 1;
 
     } else {
@@ -1576,15 +1576,55 @@ $app->get('/api/volunteerlogin/success', function (ServerRequestInterface $reque
 });
 $app->post('/api/arduino/simulator', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
     global $pdo;
-
+//url example = http://localhost:8080/api/arduino/simulator?input&locker=1&id=1&presentflag=1
    $locker = $request->getQueryParam('locker');
    $defibrillator_id=$request->getQueryParam('id');
+   $presentflag=$request->getQueryParam('presentflag');
+   $temperature=$request->getQueryParam('temperature');
+   $rfid=$request->getQueryParam('rfid');
+if ($locker!==null && $presentflag!==null){
+   $query = "UPDATE apinidotis SET locker=:locker, presentflag=:presentflag WHERE id=:id";
+   $result = $pdo->prepare($query);
+   $result->execute(array(':locker' => $locker, ':presentflag' => $presentflag, ':id' => $defibrillator_id));
+   print_r("prelocker");
+  
+}elseif($locker!==null){
+    $query = "UPDATE apinidotis SET locker=:locker WHERE id=:id";
+    $result = $pdo->prepare($query);
+    $result->execute(array(':locker' => $locker, ':id' => $defibrillator_id));
+    $identifier=("locker");
+}elseif($presentflag!==null){
+    $query = "UPDATE apinidotis SET presentflag=:presentflag WHERE id=:id";
+    $result = $pdo->prepare($query);
+    $result->execute(array( ':presentflag' => $presentflag, ':id' => $defibrillator_id));
+    $identifier=("presentflag");
+}elseif($temperature<30){
+    $identifier=("lowtempwarning");
+}elseif($temperature>50){
+    $identifier=("hightempwarning");
+}
+
+$options = array(
+    'cluster' => 'eu',
+    'useTLS' => true
+  );
+  $pusher = new Pusher\Pusher(
+    '2f7f2a748cacde676705',
+    '8dff9e8bcc92dd2cd680',
+    '706595',
+    $options
+  );
+
 
    $myObj = new stdClass();
    $myObj->locker = $locker;
    $myObj->id = $defibrillator_id;
+   $myObj->presentflag = $presentflag;
+   $myObj->identifier = $identifier;
+   $myObj->rfid = $rfid;
+   $data = $myObj;
 
-
+   $pusher->trigger('channel', 'arduino', $data);
    
   
     return json_encode($myObj);
@@ -1594,30 +1634,31 @@ $app->post('/api/arduino/simulator', function (ServerRequestInterface $request, 
 
 $app->post('/api/sendMessage', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
     global $pdo;
-  
+ 
     $sendData = json_decode(file_get_contents('php://input'));
     $message = $sendData->{'message'};
 
-  
-    $options = array(
-      'cluster' => 'eu',
-      'useTLS' => true
-    );
-    $pusher = new Pusher\Pusher(
-      '2f7f2a748cacde676705',
-      '8dff9e8bcc92dd2cd680',
-      '706595',
-      $options
-    );
-  
-    $data['message'] = $message;
-    $pusher->trigger('channel', 'event', $data);
+    //  function sendPushNotification($to="",$data=array()){
+    //      $apikey="AIzaSyCw6_PWhd1g_xsZV9GB06qxI0mlL47FWOQ";
+    //      $fields = array('to'=> $to, "notification" => $data);
+    //      $url='https://fcm.googleapis.com/fcm/send';
 
-
-    $myObj = new stdClass();
-    $myObj->message = $message;
-
-    $interestDetails = ['unique identifier', 'ExponentPushToken[CZ5D9yFnlEr-BEoEpw9M8L]'];
+    //      $ch=curl_init();
+    //      curl_setopt($ch, CURLOPT_URL, $url);
+    //      curl_setopt($ch, CURLOPT_POST, true); 
+    //      curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    //      curl_setopt($ch, CURLOPT_RETURNTRANSFER,true);
+    //      curl_setopt($ch, CURLOPT_SSL_VERIFYPEER,false);
+    //      curl_setopt($ch, CURLOPT_POSTFIELDS,json_encode($fields));
+    //      $result=curl_exec($ch);
+    //      curl_close($ch);
+    //      return json_decode($result,true);
+    //  }
+    //  $to=("1:7301688649:android:dfdb3bbaaa45dc12");
+    //  $data=array('title' => 'Έχετε νέο μήνυμα','body'=>$message);
+    //  print_r(sendPushNotification($to,$data));
+   
+    $interestDetails = ['heartbit-e68af', 'ExponentPushToken[AIzaSyCOqeCk4dFAwwnjMk7fQZ8xxeogwrNdlnU]'];
   
     // You can quickly bootup an expo instance
     $expo = \ExponentPhpSDK\Expo::normalSetup();
