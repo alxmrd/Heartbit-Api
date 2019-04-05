@@ -848,6 +848,32 @@ $message="Επιτυχης Προσθήκη Περιστατικού";
 
 
 });
+$app->post('/api/eventCorrespodence', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+ 
+  $userData = json_decode(file_get_contents('php://input'));
+$id = $userData->{'id'};
+
+    $query = "UPDATE peristatiko SET correspondence=:correspondence,correspondencetime=now() WHERE id=:id";
+   
+    $result = $pdo->prepare($query);
+
+    $result->execute(array(':correspondence' => $correspondence,':id'=> $id));
+    $query="SELECT * 
+    FROM peristatiko
+    ORDER BY id DESC
+    LIMIT 1";
+       $result = $pdo->prepare($query);
+       $result->execute(array());
+    $event = $result->fetch(PDO::FETCH_ASSOC);
+
+  
+ 
+    $response=json_encode($event,JSON_NUMERIC_CHECK);
+    return $response;
+
+
+});
 $app->post('/api/sendEvent', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
     global $pdo;
     $userData = json_decode(file_get_contents('php://input'));
@@ -860,8 +886,20 @@ $app->post('/api/sendEvent', function (ServerRequestInterface $request, Response
     $latitude = $userData->{'latitude'};
     $address = $userData->{'address'};
    
-   
-  
+ 
+    $query = "SELECT username FROM volunteer WHERE isOnline=:isOnline ";
+    $result = $pdo->query($query);
+    $result->execute(array(':isOnline' => $isOnline));
+    $data = array();
+    while ($r = $result->fetch(PDO::FETCH_ASSOC)) {
+        $data[] = $r;
+    }
+    // $object = (object) $data;
+    //  print json_encode($data);
+
+    $response = new stdClass();
+    $response->data = $data;
+    return json_encode($response, JSON_NUMERIC_CHECK);
   
     $options = array(
       'cluster' => 'eu',
@@ -904,6 +942,44 @@ $app->post('/api/sendEvent', function (ServerRequestInterface $request, Response
 
 
 });
+$app->post('/mobile/unlockDefibrillator', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+    $nearestDefibrillator = json_decode(file_get_contents('php://input'));
+
+
+
+
+
+    $id = $nearestDefibrillator->{'id'};
+
+   
+ 
+  
+    $options = array(
+      'cluster' => 'eu',
+      'useTLS' => true
+    );
+    $pusher = new Pusher\Pusher(
+      '2f7f2a748cacde676705',
+      '8dff9e8bcc92dd2cd680',
+      '706595',
+      $options
+    );
+    $myObj = new stdClass();
+    $myObj->id = $id;
+  
+
+    $data = $myObj;
+    //$data['address'] = $myObj;
+    $pusher->trigger('channel', 'apinidotis', $data);
+
+
+    
+
+    
+
+
+});
 
 
 $app->get('/api/volunteer/search', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
@@ -913,6 +989,43 @@ $app->get('/api/volunteer/search', function (ServerRequestInterface $request, Re
   
 
     $query = " SELECT * FROM volunteer WHERE  username LIKE :searchedinput   OR name LIKE :searchedinput  OR email LIKE :searchedinput OR surname LIKE :searchedinput OR location LIKE :searchedinput ";
+   
+    $result = $pdo->prepare($query);
+    $result->execute(array(':searchedinput' => "%$input%"));
+   // $result->execute(array(':searchedinput' => "$input%"));
+    $count = $result->rowCount();
+   
+    if ($count== 0){
+        $message = "O χρήστης που αναζητήσατε, δεν υπάρχει!";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message, 409);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 404);
+       
+
+        return $response;
+
+    }
+    while ($r = $result->fetch(PDO::FETCH_ASSOC)) {
+        $data[] = $r;
+    }
+
+    // $myObj = new stdClass();
+    // $myObj->user = $user;
+   
+    $response = json_encode($data, JSON_NUMERIC_CHECK);
+
+    return $response;
+});
+$app->get('/api/admin/search', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+
+ $input = $request->getQueryParam('input');
+  
+
+    $query = " SELECT * FROM ekab WHERE  username LIKE :searchedinput   OR name LIKE :searchedinput  OR email LIKE :searchedinput OR surname LIKE :searchedinput OR address LIKE :searchedinput ";
    
     $result = $pdo->prepare($query);
     $result->execute(array(':searchedinput' => "%$input%"));
@@ -1519,6 +1632,502 @@ $app->post('/api/editadmin/{id}', function (ServerRequestInterface $request, Res
 
         }
     }
+
+});
+
+$app->post('/api/mobile/changepassword', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+    require_once 'validation/validationRules.php';
+    
+    $userData = json_decode(file_get_contents('php://input'));
+    $volunteer_id = $userData->{'id'};
+
+    $password = $userData->{'password'};
+    if (!$passwordValidator->validate($password)) {
+        $message = "Ο κωδικός πρέπει να είναι 10 ψηφία. ";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    }
+ 
+
+ 
+ 
+           
+            $query = "UPDATE volunteer SET password=:password WHERE id=:id";
+            $result = $pdo->prepare($query);
+
+            $result->execute(array(':password' => $password,':id'=>$volunteer_id));
+         
+          
+            $message = "success";
+            //  $response=json_encode($lastId);
+            $myObj = new stdClass();
+            $myObj->id = $volunteer_id;
+   
+            $myObj->password = $password;
+       
+            
+            $myObj->message = $message;
+           
+
+            $response = json_encode($myObj, JSON_NUMERIC_CHECK);
+
+            return $response;
+
+
+});
+$app->post('/api/mobile/changeaddress', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+    require_once 'validation/validationRules.php';
+    
+    $userData = json_decode(file_get_contents('php://input'));
+    $volunteer_id = $userData->{'id'};
+
+    $address = $userData->{'address'};
+    if (!$addressValidator->validate($address)) {
+        $message = "Mη αποδεκτή μορφή Διεύθυνσης. ";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    }
+ 
+
+ 
+ 
+           
+            $query = "UPDATE volunteer SET address=:address WHERE id=:id";
+            $result = $pdo->prepare($query);
+
+            $result->execute(array(':address' => $address,':id'=>$volunteer_id));
+         
+          
+            $message = "success";
+            //  $response=json_encode($lastId);
+            $myObj = new stdClass();
+            $myObj->id = $volunteer_id;
+   
+            $myObj->address = $address;
+       
+            
+            $myObj->message = $message;
+           
+
+            $response = json_encode($myObj, JSON_NUMERIC_CHECK);
+
+            return $response;
+
+
+});
+$app->post('/api/mobile/changelocation', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+    require_once 'validation/validationRules.php';
+    
+    $userData = json_decode(file_get_contents('php://input'));
+    $volunteer_id = $userData->{'id'};
+
+    $location = $userData->{'location'};
+    if (!$locationValidator->validate($location)) {
+        $message = "Mη αποδεκτή μορφή Περιφέρειας. ";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    }
+ 
+
+ 
+ 
+           
+            $query = "UPDATE volunteer SET location=:location WHERE id=:id";
+            $result = $pdo->prepare($query);
+
+            $result->execute(array(':location' => $location,':id'=>$volunteer_id));
+         
+          
+            $message = "success";
+            //  $response=json_encode($lastId);
+            $myObj = new stdClass();
+            $myObj->id = $volunteer_id;
+   
+            $myObj->location = $location;
+       
+            
+            $myObj->message = $message;
+           
+
+            $response = json_encode($myObj, JSON_NUMERIC_CHECK);
+
+            return $response;
+
+
+});
+$app->post('/api/mobile/changename', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+    require_once 'validation/validationRules.php';
+    
+    $userData = json_decode(file_get_contents('php://input'));
+    $volunteer_id = $userData->{'id'};
+
+    $name = $userData->{'name'};
+    if (!$nameValidator->validate($name)) {
+        $message = "Πληκτρολογήσατε μη αποδεκτό Όνομα Χρήστη.";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    }
+ 
+
+ 
+ 
+           
+            $query = "UPDATE volunteer SET name=:name WHERE id=:id";
+            $result = $pdo->prepare($query);
+
+            $result->execute(array(':name' => $name,':id'=>$volunteer_id));
+         
+          
+            $message = "success";
+            //  $response=json_encode($lastId);
+            $myObj = new stdClass();
+            $myObj->id = $volunteer_id;
+   
+            $myObj->name = $name;
+       
+            
+            $myObj->message = $message;
+           
+
+            $response = json_encode($myObj, JSON_NUMERIC_CHECK);
+
+            return $response;
+
+
+});
+$app->post('/api/mobile/changesurname', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+    require_once 'validation/validationRules.php';
+    
+    $userData = json_decode(file_get_contents('php://input'));
+    $volunteer_id = $userData->{'id'};
+
+    $surname = $userData->{'surname'};
+    if (!$surnameValidator->validate($surname)) {
+        $message = "Πληκτρολογήσατε μη αποδεκτό Επώνυμο.";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    }
+ 
+
+ 
+ 
+           
+            $query = "UPDATE volunteer SET surname=:surname WHERE id=:id";
+            $result = $pdo->prepare($query);
+
+            $result->execute(array(':surname' => $surname,':id'=>$volunteer_id));
+         
+          
+            $message = "success";
+            //  $response=json_encode($lastId);
+            $myObj = new stdClass();
+            $myObj->id = $volunteer_id;
+   
+            $myObj->surname = $surname;
+       
+            
+            $myObj->message = $message;
+           
+
+            $response = json_encode($myObj, JSON_NUMERIC_CHECK);
+
+            return $response;
+
+
+});
+
+$app->post('/api/mobile/changetel', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+    require_once 'validation/validationRules.php';
+    
+    $userData = json_decode(file_get_contents('php://input'));
+    $volunteer_id = $userData->{'id'};
+
+    $tel1 = $userData->{'tel1'};
+    if (!$mobileNumberValidator->validate($tel1)) {
+        $message = "Mη αποδεκτή μορφή αριθμού κινητού τηλεφώνου. ";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    }
+ 
+
+ 
+ 
+           
+            $query = "UPDATE volunteer SET tel1=:tel1 WHERE id=:id";
+            $result = $pdo->prepare($query);
+
+            $result->execute(array(':tel1' => $tel1,':id'=>$volunteer_id));
+         
+          
+            $message = "success";
+            //  $response=json_encode($lastId);
+            $myObj = new stdClass();
+            $myObj->id = $volunteer_id;
+   
+            $myObj->tel1 = $tel1;
+       
+            
+            $myObj->message = $message;
+           
+
+            $response = json_encode($myObj, JSON_NUMERIC_CHECK);
+
+            return $response;
+
+
+});
+
+$app->post('/api/mobile/changetel2', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+    require_once 'validation/validationRules.php';
+    
+    $userData = json_decode(file_get_contents('php://input'));
+    $volunteer_id = $userData->{'id'};
+
+    $tel2 = $userData->{'tel2'};
+    if (!$mobile2NumberValidator->validate($tel2)) {
+        $message = "Mη αποδεκτή μορφή αριθμού κινητού τηλεφώνου. ";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    }
+ 
+
+ 
+ 
+           
+            $query = "UPDATE volunteer SET tel2=:tel2 WHERE id=:id";
+            $result = $pdo->prepare($query);
+
+            $result->execute(array(':tel2' => $tel2,':id'=>$volunteer_id));
+         
+          
+            $message = "success";
+            //  $response=json_encode($lastId);
+            $myObj = new stdClass();
+            $myObj->id = $volunteer_id;
+   
+            $myObj->tel2 = $tel2;
+       
+            
+            $myObj->message = $message;
+           
+
+            $response = json_encode($myObj, JSON_NUMERIC_CHECK);
+
+            return $response;
+
+
+});
+$app->post('/api/mobile/changeuseractivity', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+    require_once 'validation/validationRules.php';
+    
+    $userData = json_decode(file_get_contents('php://input'));
+    $volunteer_id = $userData->{'id'};
+
+    $isOnline = $userData->{'isOnline'};
+    if ($isOnline==false){
+        $isOnline = 0;
+    };
+    if ($isOnline==true){
+        $isOnline = 1;
+    };
+      $query = "UPDATE volunteer SET isOnline=:isOnline WHERE id=:id";
+            $result = $pdo->prepare($query);
+
+            $result->execute(array(':isOnline' => $isOnline,':id'=>$volunteer_id));
+         
+          
+            $message = "success";
+            //  $response=json_encode($lastId);
+            $myObj = new stdClass();
+            $myObj->id = $volunteer_id;
+   
+            $myObj->isOnline = $isOnline;
+       
+            
+            $myObj->message = $message;
+           
+
+            $response = json_encode($myObj, JSON_NUMERIC_CHECK);
+
+            return $response;
+
+
+});
+
+$app->post('/api/mobile/changeemail', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+    require_once 'validation/validationRules.php';
+    
+    $userData = json_decode(file_get_contents('php://input'));
+    $volunteer_id = $userData->{'id'};
+
+    $email = $userData->{'email'};
+    $query = "SELECT * FROM volunteer WHERE email=:email AND id<>:id";
+    $result = $pdo->prepare($query);
+    $result->execute(array(':email' => $email,'id' => $volunteers_id));
+    $count = $result->rowCount();
+    $user = $result->fetch(PDO::FETCH_BOTH);
+    if ($count == 1 && !empty($user)) {
+        $message = "Υπάρχει ήδη εθελοντής με αυτο το E-mail";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message, 409);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    } 
+    if (!$emailValidator->validate($email)) {
+        $message = "Μη αποδεκτή μορφή E-mail.";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    }
+ 
+
+ 
+ 
+           
+            $query = "UPDATE volunteer SET email=:email WHERE id=:id";
+            $result = $pdo->prepare($query);
+
+            $result->execute(array(':email' => $email,':id'=>$volunteer_id));
+         
+          
+            $message = "success";
+            //  $response=json_encode($lastId);
+            $myObj = new stdClass();
+            $myObj->id = $volunteer_id;
+   
+            $myObj->email = $email;
+       
+            
+            $myObj->message = $message;
+           
+
+            $response = json_encode($myObj, JSON_NUMERIC_CHECK);
+
+            return $response;
+
+
+});
+$app->post('/api/mobile/changeusername', function (ServerRequestInterface $request, ResponseInterface $response, array $args) {
+    global $pdo;
+    require_once 'validation/validationRules.php';
+    
+    $userData = json_decode(file_get_contents('php://input'));
+    $volunteer_id = $userData->{'id'};
+
+    $username = $userData->{'username'};
+    $query = "SELECT * FROM volunteer WHERE username=:username AND id<>:id";
+    $result = $pdo->prepare($query);
+    $result->execute(array(':username' => $username,'id' => $volunteers_id));
+    $count = $result->rowCount();
+    $user = $result->fetch(PDO::FETCH_BOTH);
+    if ($count == 1 && !empty($user)) {
+        $message = "Υπάρχει ήδη εθελοντής με αυτο το Όνομα Χρήστη";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message, 409);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    } 
+    if (!$usernameValidator->validate($username)) {
+        $message = "Πληκτρολογήσατε μη αποδεκτό Όνομα Χρήστη.";
+        $httpstatus = "error";
+        $data = array('httpstatus' => $httpstatus, 'data' => null, 'message' => $message);
+        $myObj = new stdClass();
+        $myObj->message = $message;
+        $myObj->httpstatus = $httpstatus;
+        $response = $response->withJson($myObj, 409);
+
+        return $response;
+    }
+ 
+
+ 
+ 
+           
+            $query = "UPDATE volunteer SET username=:username WHERE id=:id";
+            $result = $pdo->prepare($query);
+
+            $result->execute(array(':username' => $username,':id'=>$volunteer_id));
+         
+          
+            $message = "success";
+            //  $response=json_encode($lastId);
+            $myObj = new stdClass();
+            $myObj->id = $volunteer_id;
+   
+            $myObj->username = $username;
+       
+            
+            $myObj->message = $message;
+           
+
+            $response = json_encode($myObj, JSON_NUMERIC_CHECK);
+
+            return $response;
+
 
 });
 
